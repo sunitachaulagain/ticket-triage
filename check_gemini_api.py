@@ -1,5 +1,16 @@
+"""Manual Gemini connectivity check.
+
+Run explicitly:
+
+    python check_gemini_api.py
+
+This module performs no network call on import, so pytest (or any other
+tool that merely imports it) never triggers an API request.
+"""
+
 import os
 import json
+
 import httpx
 from dotenv import load_dotenv
 
@@ -8,11 +19,6 @@ load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 
 url = "https://generativelanguage.googleapis.com/v1beta/interactions"
-
-headers = {
-    "x-goog-api-key": api_key,
-    "Content-Type": "application/json",
-}
 
 schema = {
     "type": "object",
@@ -56,18 +62,28 @@ payload = {
     },
 }
 
-response = httpx.post(
-    url,
-    headers=headers,
-    json=payload,
-    timeout=60,
-)
 
-print("Status:", response.status_code)
+def main() -> None:
+    headers = {
+        "x-goog-api-key": api_key,
+        "Content-Type": "application/json",
+    }
 
-data = response.json()
+    response = httpx.post(
+        url,
+        headers=headers,
+        json=payload,
+        timeout=60,
+    )
 
-if response.status_code == 200:
+    print("Status:", response.status_code)
+
+    if response.status_code != 200:
+        print(response.text)
+        return
+
+    data = response.json()
+
     output_text = None
 
     for step in data.get("steps", []):
@@ -85,5 +101,6 @@ if response.status_code == 200:
         print("\nParsed JSON:")
         print(json.dumps(result, indent=2))
 
-else:
-    print(response.text)
+
+if __name__ == "__main__":
+    main()

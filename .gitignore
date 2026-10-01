@@ -5,3 +5,6 @@ __pycache__/
 .env.*
 node_modules/
 dist/
+
+# Confidential take-home brief - keep local, never publish
+docs/Caregene_Intern_Project_Brief.pdf
