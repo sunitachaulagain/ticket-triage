@@ -1,1 +1,4 @@
 fastapi[standard]
+httpx
+python-dotenvty
+pytest
