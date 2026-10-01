@@ -40,13 +40,15 @@ class TriageStatus(str, Enum):
 
 class TriageResult(BaseModel):
     ticket_id: int
-    urgency: Urgency
-    category: Category
-    sentiment: Sentiment
-    suggested_reply: str = Field(min_length=1)
-    confidence: float = Field(ge=0.0, le=1.0)
-    rationale: str = Field(max_length=240)
-    needs_human_review: bool
+    # Nullable so a failed ticket can be reported without inventing a
+    # classification. Services guarantee these are populated when status is OK.
+    urgency: Urgency | None = None
+    category: Category | None = None
+    sentiment: Sentiment | None = None
+    suggested_reply: str | None = None
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    rationale: str | None = Field(default=None, max_length=240)
+    needs_human_review: bool = True
     tags: list[str] = Field(default_factory=list)
 
     model: str
