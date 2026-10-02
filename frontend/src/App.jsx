@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { getHealth, getTickets, runBatchTriage, USING_MOCK_BATCH } from './api/client'
-import BreakdownCharts from './components/BreakdownCharts'
+
+// Recharts is the heaviest dependency in the app. Importing the chart section
+// lazily keeps it out of the main bundle, so the dashboard and the results
+// table load first and the charts stream in just after.
+const BreakdownCharts = lazy(() => import('./components/BreakdownCharts'))
+
 import ResultsTable from './components/ResultsTable'
 import SummaryPanel from './components/SummaryPanel'
 
@@ -8,6 +13,42 @@ const HEALTH_BADGE = {
   checking: ['text-bg-secondary', 'Checking backend…'],
   online: ['text-bg-success', 'Backend online'],
   offline: ['text-bg-danger', 'Backend unreachable'],
+}
+
+// Mirrors BreakdownCharts' markup and 260px height so the page does not jump
+// when the lazily-loaded chunk resolves. The title of each chart is static, so
+// there is no need to wait for the chunk to show it.
+const CHART_TITLES = ['Urgency', 'Category', 'Sentiment']
+
+function ChartsFallback() {
+  return (
+    <section className="mb-4">
+      <h2 className="h5 mb-3">Ticket distribution</h2>
+
+      <div className="row row-cols-1 row-cols-lg-3 g-3">
+        {CHART_TITLES.map((title) => (
+          <div className="col" key={title}>
+            <div className="card h-100">
+              <div className="card-body">
+                <h3 className="h6 mb-3">{title}</h3>
+                <div
+                  className="d-flex align-items-center justify-content-center"
+                  style={{ height: 260 }}
+                >
+                  <span
+                    className="spinner-border spinner-border-sm me-2"
+                    role="status"
+                    aria-hidden="true"
+                  />
+                  <span className="text-muted small">Loading chart…</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
 }
 
 function App() {
@@ -129,7 +170,9 @@ function App() {
       {status === 'success' && batch && (
         <>
           <SummaryPanel summary={batch.summary} />
-          <BreakdownCharts summary={batch.summary} />
+          <Suspense fallback={<ChartsFallback />}>
+            <BreakdownCharts summary={batch.summary} />
+          </Suspense>
           <ResultsTable batch={batch} />
         </>
       )}
