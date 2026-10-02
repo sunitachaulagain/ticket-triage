@@ -60,3 +60,33 @@ class TriageResult(BaseModel):
     latency_ms: int = Field(ge=0)
     status: TriageStatus
     error: str | None = None
+
+
+class TriageStatistics(BaseModel):
+    """Aggregate view of a list of triage results.
+
+    Every breakdown carries all of its allowed keys, zero-filled in enum
+    definition order. A zero means no result carried that classification,
+    which is different from a classification that was never produced at all.
+    """
+
+    total_tickets: int
+    successful: int
+    failed: int
+    needs_human_review: int
+    average_confidence: float | None
+    average_latency_ms: float | None
+    urgency_breakdown: dict[Urgency, int]
+    category_breakdown: dict[Category, int]
+    sentiment_breakdown: dict[Sentiment, int]
+
+
+class BatchTriageResponse(BaseModel):
+    """Response for the batch endpoint: an aggregate summary plus every result.
+
+    The results are passed through unchanged and in the order triage_batch
+    returned them, so one payload serves both the summary panel and the table.
+    """
+
+    summary: TriageStatistics
+    results: list[TriageResult]

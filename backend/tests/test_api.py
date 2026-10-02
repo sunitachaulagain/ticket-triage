@@ -18,6 +18,7 @@ from backend.app.schemas import (
 )
 from backend.app.services import gemini
 from backend.app.services import triage as triage_service
+from backend.app.services.results import calculate_statistics
 
 
 ALLOWED_ORIGIN = "http://localhost:5173"
@@ -147,12 +148,17 @@ def test_batch_returns_service_results(
 
     assert response.status_code == 200
 
-    results = response.json()
+    body = response.json()
 
     assert len(calls) == 1
-    assert len(results) == 2
-    assert results[0]["status"] == "ok"
-    assert results[1]["status"] == "failed"
+    assert body["summary"]["total_tickets"] == 2
+    assert body["summary"]["successful"] == 1
+    assert body["summary"]["failed"] == 1
+    # The failed stub is flagged for review; the successful one is not.
+    assert body["summary"]["needs_human_review"] == 1
+    assert len(body["results"]) == 2
+    assert body["results"][0]["status"] == "ok"
+    assert body["results"][1]["status"] == "failed"
 
 
 def test_batch_preserves_failed_ticket_fields(
@@ -164,9 +170,9 @@ def test_batch_preserves_failed_ticket_fields(
 
     monkeypatch.setattr(triage_service, "triage_batch", fake_triage_batch)
 
-    results = client.post("/api/triage/batch").json()
+    body = client.post("/api/triage/batch").json()
 
-    failed = results[0]
+    failed = body["results"][0]
 
     assert failed["status"] == "failed"
     assert failed["ticket_id"] == 7
@@ -175,6 +181,60 @@ def test_batch_preserves_failed_ticket_fields(
     assert failed["category"] is None
     assert failed["suggested_reply"] is None
     assert failed["tags"] == []
+
+
+def test_batch_summary_matches_calculate_statistics(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stubs = [make_result(1), make_result(2, TriageStatus.FAILED)]
+
+    async def fake_triage_batch():
+        return stubs
+
+    monkeypatch.setattr(triage_service, "triage_batch", fake_triage_batch)
+
+    body = client.post("/api/triage/batch").json()
+
+    # The route must reuse the service rather than reimplement the maths, so
+    # the payload has to be identical to what the service produces.
+    assert body["summary"] == calculate_statistics(stubs).model_dump(mode="json")
+
+
+def test_batch_response_preserves_result_order(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stubs = [make_result(3), make_result(1), make_result(2)]
+
+    async def fake_triage_batch():
+        return stubs
+
+    monkeypatch.setattr(triage_service, "triage_batch", fake_triage_batch)
+
+    body = client.post("/api/triage/batch").json()
+
+    # Pass-through order, not re-sorted by ticket id.
+    assert [r["ticket_id"] for r in body["results"]] == [3, 1, 2]
+
+
+def test_batch_results_are_unchanged(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stubs = [make_result(1), make_result(2, TriageStatus.FAILED)]
+
+    async def fake_triage_batch():
+        return stubs
+
+    monkeypatch.setattr(triage_service, "triage_batch", fake_triage_batch)
+
+    body = client.post("/api/triage/batch").json()
+
+    # Every field of every result survives the response model untouched.
+    assert body["results"] == [
+        stub.model_dump(mode="json") for stub in stubs
+    ]
 
 
 def test_batch_propagates_unexpected_errors(

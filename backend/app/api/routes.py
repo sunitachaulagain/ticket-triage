@@ -8,8 +8,13 @@ so tests can substitute it without touching this file.
 from fastapi import APIRouter, HTTPException
 
 from backend.app.dataset import SupportTicket, load_tickets
-from backend.app.schemas import TriageRequest, TriageResult
+from backend.app.schemas import (
+    BatchTriageResponse,
+    TriageRequest,
+    TriageResult,
+)
 from backend.app.services import triage as triage_service
+from backend.app.services.results import calculate_statistics
 
 
 router = APIRouter(prefix="/api", tags=["triage"])
@@ -42,6 +47,13 @@ async def triage_ticket(payload: TriageRequest) -> TriageResult:
     return await triage_service.triage_ticket(ticket)
 
 
-@router.post("/triage/batch", response_model=list[TriageResult])
-async def triage_all() -> list[TriageResult]:
-    return await triage_service.triage_batch()
+@router.post("/triage/batch", response_model=BatchTriageResponse)
+async def triage_all() -> BatchTriageResponse:
+    # The summary is derived from results already in memory, so it adds no
+    # Gemini calls. results is passed through by reference, unchanged.
+    results = await triage_service.triage_batch()
+
+    return BatchTriageResponse(
+        summary=calculate_statistics(results),
+        results=results,
+    )
