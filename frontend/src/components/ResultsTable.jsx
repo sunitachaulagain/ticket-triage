@@ -67,10 +67,22 @@ function formatConfidence(confidence) {
 }
 
 // The details row is where the long backend strings live, so the table itself
-// stays readable at a glance.
-function ResultDetails({ result }) {
+// stays readable at a glance. The customer message is shown first because the
+// suggested reply only makes sense read after it.
+function ResultDetails({ result, message }) {
   return (
     <div className="row row-cols-1 row-cols-lg-2 g-3 small">
+      <div className="col-12">
+        <div className="fw-semibold">Original customer message</div>
+        {message === undefined ? (
+          // No message here means the tickets fetch did not succeed, which is
+          // data the frontend must report rather than hide.
+          <span className="text-muted">Original message unavailable</span>
+        ) : (
+          <div style={{ whiteSpace: 'pre-wrap' }}>{message}</div>
+        )}
+      </div>
+
       {result.suggested_reply && (
         <div className="col-12">
           <div className="fw-semibold">Suggested reply</div>
@@ -116,7 +128,7 @@ function ResultDetails({ result }) {
   )
 }
 
-function ResultsTable({ batch }) {
+function ResultsTable({ batch, messagesByTicketId }) {
   // One piece of state drives every row. Clicking a ticket id expands that row
   // and collapses whichever row was open before, so only one row is open at a
   // time without needing one state per row.
@@ -129,7 +141,8 @@ function ResultsTable({ batch }) {
       </h2>
 
       <p className="text-muted small">
-        Select a ticket ID to show its suggested reply, rationale, tags, model
+        Select a ticket ID to see the original customer message next to the
+        triage result, along with its suggested reply, rationale, tags, model
         and any error.
       </p>
 
@@ -198,7 +211,10 @@ function ResultsTable({ batch }) {
                   {isOpen && (
                     <tr>
                       <td colSpan={8} className="bg-body-tertiary">
-                        <ResultDetails result={result} />
+                        <ResultDetails
+                          result={result}
+                          message={messagesByTicketId.get(result.ticket_id)}
+                        />
                       </td>
                     </tr>
                   )}

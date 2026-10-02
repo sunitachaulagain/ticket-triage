@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { getHealth, getTickets, runBatchTriage, USING_MOCK_BATCH } from './api/client'
 
 // Recharts is the heaviest dependency in the app. Importing the chart section
@@ -58,7 +58,10 @@ function App() {
   const [error, setError] = useState('')
 
   const [health, setHealth] = useState('checking')
-  const [ticketCount, setTicketCount] = useState(null)
+  // The ticket objects are kept, not just their count, so a triage result can
+  // be shown next to the customer message it came from. null means the fetch
+  // has not succeeded, which is what the header badge keys off.
+  const [tickets, setTickets] = useState(null)
 
   // GET /api/health and GET /api/tickets make no Gemini calls, so they are a
   // safe way to prove the base URL and CORS wiring work before running a batch.
@@ -68,9 +71,17 @@ function App() {
       .catch(() => setHealth('offline'))
 
     getTickets()
-      .then((tickets) => setTicketCount(tickets.length))
-      .catch(() => setTicketCount(null))
+      .then(setTickets)
+      .catch(() => setTickets(null))
   }, [])
+
+  // ticket_id on a triage result is the same id the tickets endpoint serves, so
+  // one map turns the join into a single lookup at render time. Built once per
+  // fetch rather than per row.
+  const messagesByTicketId = useMemo(
+    () => new Map((tickets ?? []).map((ticket) => [ticket.id, ticket.message])),
+    [tickets],
+  )
 
   async function handleRunBatch() {
     setError('')
@@ -104,9 +115,9 @@ function App() {
             <p className="text-muted mb-3">Support Ticket Intelligence</p>
             <div className="d-flex flex-wrap gap-2 align-items-center">
               <span className={`badge ${healthVariant}`}>{healthLabel}</span>
-              {ticketCount !== null && (
+              {tickets !== null && (
                 <span className="badge text-bg-light border">
-                  {ticketCount} tickets loaded
+                  {tickets.length} tickets loaded
                 </span>
               )}
               {USING_MOCK_BATCH && (
@@ -173,7 +184,7 @@ function App() {
           <Suspense fallback={<ChartsFallback />}>
             <BreakdownCharts summary={batch.summary} />
           </Suspense>
-          <ResultsTable batch={batch} />
+          <ResultsTable batch={batch} messagesByTicketId={messagesByTicketId} />
         </>
       )}
     </div>
