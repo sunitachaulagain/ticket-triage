@@ -1,8 +1,8 @@
+from backend.app.prompts import PROMPT_VERSION
 from backend.app.schemas import TriageResult
 
 
 MODEL_NAME = "gemini-3.5-flash-lite"
-PROMPT_VERSION = "v1"
 
 
 def validate_triage_result(

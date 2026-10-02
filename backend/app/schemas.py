@@ -38,6 +38,10 @@ class TriageStatus(str, Enum):
     FALLBACK = "fallback"
 
 
+class TriageRequest(BaseModel):
+    ticket_id: int
+
+
 class TriageResult(BaseModel):
     ticket_id: int
     # Nullable so a failed ticket can be reported without inventing a

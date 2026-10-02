@@ -5,10 +5,11 @@ Runs one ticket or the whole dataset through the Gemini triage pipeline:
     ticket -> build_triage_prompt -> call_gemini -> extract_model_output
            -> validate_triage_result
 
-Processing is sequential on purpose so the real batch runtime can be
-measured before any concurrency is introduced.
+The batch runs tickets with bounded concurrency so the request duration
+stays acceptable for a frontend caller.
 """
 
+import asyncio
 import time
 
 from backend.app.dataset import SupportTicket, load_tickets
@@ -35,6 +36,10 @@ REQUIRED_AI_FIELDS = (
 )
 
 MAX_ERROR_LENGTH = 500
+
+# Conservative cap on in-flight Gemini requests. Higher values risk
+# rate limiting without a large gain, since each call is network bound.
+MAX_CONCURRENCY = 2
 
 
 async def triage_ticket(ticket: SupportTicket) -> TriageResult:
@@ -80,29 +85,39 @@ def build_failed_result(
 
 
 async def triage_batch() -> list[TriageResult]:
-    """Triage every ticket in the dataset, sequentially.
+    """Triage every ticket in the dataset with bounded concurrency.
 
+    Results stay in dataset order no matter which request finishes first.
     A single ticket failure never stops the batch. A dataset loading
     failure does propagate, since there would be no ticket IDs to report.
     """
     tickets = load_tickets()
 
-    results: list[TriageResult] = []
+    semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
 
-    for ticket in tickets:
-        start = time.perf_counter()
+    async def run_one(ticket: SupportTicket) -> TriageResult:
+        async with semaphore:
+            # Timed after acquiring the semaphore, so latency reflects the
+            # work done for this ticket rather than queue wait.
+            start = time.perf_counter()
 
-        try:
-            results.append(await triage_ticket(ticket))
-        except Exception as exc:
-            latency_ms = int((time.perf_counter() - start) * 1000)
+            try:
+                return await triage_ticket(ticket)
+            except asyncio.CancelledError:
+                # Cancellation is not a triage failure. Re-raise so request
+                # cancellation still works.
+                raise
+            except Exception as exc:
+                latency_ms = int((time.perf_counter() - start) * 1000)
 
-            results.append(
-                build_failed_result(
+                return build_failed_result(
                     ticket_id=ticket.id,
                     latency_ms=latency_ms,
                     error=f"{type(exc).__name__}: {exc}",
                 )
-            )
 
-    return results
+    # gather returns results in argument order, so the output list matches
+    # dataset order regardless of completion order. return_exceptions is
+    # deliberately not used: it would capture CancelledError as a value and
+    # turn a cancelled request into failed tickets.
+    return list(await asyncio.gather(*(run_one(ticket) for ticket in tickets)))
