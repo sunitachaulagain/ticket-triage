@@ -1,41 +1,53 @@
-// A captured copy of the backend's POST /api/triage/batch response.
+// A hand-written stand-in for the backend's POST /api/triage/batch response.
 //
 // It exists so the populated results view can be built and reviewed without
 // spending Gemini quota. The values are hand-written to match the contract in
 // backend/app/schemas.py exactly, including the nullable fields on failed
 // results and the fixed key sets of the breakdowns.
 //
-// The summary below is what backend/app/services/results.py would compute for
-// these same results, so the fixture is internally consistent.
+// Every ticket_id here exists in docs/support_tickets.json, which is the
+// dataset the backend serves. The results are in dataset order, and each
+// classification is derived from that ticket's own message, so the fixture
+// stays a faithful preview of what a real batch returns.
+//
+// Tickets 6, 11 and 16 are failed results. A failed ticket carries no AI
+// classification at all: it reports the backend error and leaves every
+// classification field null, exactly as build_failed_result does in
+// backend/app/services/triage.py.
 
 export const MOCK_BATCH_RESPONSE = {
   summary: {
-    total_tickets: 8,
-    successful: 6,
-    failed: 2,
-    needs_human_review: 6,
-    // mean of [0.94, 0.91, 0.88, 0.96, 0.89, 0.62] = 5.2 / 6
-    average_confidence: 0.8667,
-    // mean of [4120, 3980, 3650, 3410, 4290, 61000, 120, 4520] = 85090 / 8
-    average_latency_ms: 10636.25,
+    total_tickets: 20,
+    successful: 17,
+    failed: 3,
+    // Failed results always count, because a failed result is by definition
+    // queued for a human. 9 more flagged from the successful results.
+    needs_human_review: 12,
+    // mean of the 17 successful confidences = 15.06 / 17
+    average_confidence: 0.8859,
+    // mean of all 20 latencies = 144320 / 20. Failed results are included
+    // because latency_ms is always populated, even for a failed ticket.
+    average_latency_ms: 7216.0,
+    // Every breakdown counts only the 17 results that carry a classification,
+    // which is why each one sums to 17 rather than to 20.
     urgency_breakdown: {
-      Critical: 2,
-      High: 1,
-      Medium: 1,
-      Low: 2,
+      Critical: 4,
+      High: 3,
+      Medium: 3,
+      Low: 7,
     },
     category_breakdown: {
-      Billing: 1,
-      Technical: 2,
-      Account: 1,
-      Feedback: 1,
-      Other: 1,
+      Billing: 4,
+      Technical: 6,
+      Account: 2,
+      Feedback: 3,
+      Other: 2,
     },
     sentiment_breakdown: {
-      Angry: 2,
-      Frustrated: 1,
-      Neutral: 2,
-      Happy: 1,
+      Angry: 4,
+      Frustrated: 4,
+      Neutral: 6,
+      Happy: 3,
     },
   },
   results: [
@@ -140,13 +152,84 @@ export const MOCK_BATCH_RESPONSE = {
       tags: [],
       model: 'gemini-3.5-flash-lite',
       prompt_version: 'v2',
-      latency_ms: 61000,
+      latency_ms: 60420,
       status: 'failed',
       error:
-        'TimeoutException: Request timed out after 60s while calling the Gemini API.',
+        'ReadTimeout: The request timed out after 60s while calling the Gemini API.',
     },
     {
       ticket_id: 7,
+      urgency: 'Medium',
+      category: 'Billing',
+      sentiment: 'Neutral',
+      suggested_reply:
+        'Moving from monthly to annual billing is a plan change on your subscription, and annual plans usually carry a discount. I can confirm your request and point you to where the change is made.',
+      confidence: 0.85,
+      rationale:
+        'Clear billing and plan question with no complaint about an existing charge.',
+      needs_human_review: false,
+      tags: ['plan-change', 'pricing-question'],
+      model: 'gemini-3.5-flash-lite',
+      prompt_version: 'v2',
+      latency_ms: 3520,
+      status: 'ok',
+      error: null,
+    },
+    {
+      ticket_id: 8,
+      urgency: 'Low',
+      category: 'Account',
+      sentiment: 'Neutral',
+      suggested_reply:
+        'Changing the app language is done in your profile settings, where Nepali can be selected from the language list.',
+      confidence: 0.9,
+      rationale: 'Simple settings change request with a clear outcome and no urgency.',
+      needs_human_review: false,
+      tags: ['language-setting', 'accessibility'],
+      model: 'gemini-3.5-flash-lite',
+      prompt_version: 'v2',
+      latency_ms: 3340,
+      status: 'ok',
+      error: null,
+    },
+    {
+      ticket_id: 9,
+      urgency: 'High',
+      category: 'Technical',
+      sentiment: 'Frustrated',
+      suggested_reply:
+        "I am sorry the pill scanner stopped recognising your father's medications after the update. This looks like a regression in scanning accuracy and needs to be investigated by our team.",
+      confidence: 0.93,
+      rationale:
+        'Medication identification regressed after an update, which risks wrong doses.',
+      needs_human_review: true,
+      tags: ['medication-scanning', 'regression'],
+      model: 'gemini-3.5-flash-lite',
+      prompt_version: 'v2',
+      latency_ms: 4870,
+      status: 'ok',
+      error: null,
+    },
+    {
+      ticket_id: 10,
+      urgency: 'Low',
+      category: 'Other',
+      sentiment: 'Neutral',
+      suggested_reply:
+        'Apple Watch syncing is a feature request rather than a fault. I can confirm the request has been recorded for the product team.',
+      confidence: 0.62,
+      rationale:
+        'Feature request with no stated urgency; no existing behaviour has broken.',
+      needs_human_review: true,
+      tags: ['feature-request', 'wearable'],
+      model: 'gemini-3.5-flash-lite',
+      prompt_version: 'v2',
+      latency_ms: 5140,
+      status: 'ok',
+      error: null,
+    },
+    {
+      ticket_id: 11,
       urgency: null,
       category: null,
       sentiment: null,
@@ -157,25 +240,163 @@ export const MOCK_BATCH_RESPONSE = {
       tags: [],
       model: 'gemini-3.5-flash-lite',
       prompt_version: 'v2',
-      latency_ms: 120,
+      latency_ms: 7640,
       status: 'failed',
-      error: 'RuntimeError: GEMINI_API_KEY is not configured',
+      error:
+        "HTTPStatusError: Client error '429 Too Many Requests' for url 'https://generativelanguage.googleapis.com/v1beta/interactions'",
     },
     {
-      ticket_id: 8,
+      ticket_id: 12,
+      urgency: 'Low',
+      category: 'Feedback',
+      sentiment: 'Happy',
+      suggested_reply:
+        'Thank you for taking the time to say this. It is lovely to hear that your experience with our support team has been a good one.',
+      confidence: 0.95,
+      rationale: 'Praise for a support agent with no issue to resolve.',
+      needs_human_review: false,
+      tags: ['positive-feedback', 'praise'],
+      model: 'gemini-3.5-flash-lite',
+      prompt_version: 'v2',
+      latency_ms: 2980,
+      status: 'ok',
+      error: null,
+    },
+    {
+      ticket_id: 13,
+      urgency: 'Medium',
+      category: 'Technical',
+      sentiment: 'Frustrated',
+      suggested_reply:
+        'I am sorry the dashboard is taking around 30 seconds to load. That is well outside the expected load time, so I have flagged the performance issue for the engineering team.',
+      confidence: 0.87,
+      rationale:
+        'Severe and repeatable slowness, reported as frustration rather than an outage.',
+      needs_human_review: true,
+      tags: ['performance', 'slow-load'],
+      model: 'gemini-3.5-flash-lite',
+      prompt_version: 'v2',
+      latency_ms: 6230,
+      status: 'ok',
+      error: null,
+    },
+    {
+      ticket_id: 14,
+      urgency: 'Critical',
+      category: 'Billing',
+      sentiment: 'Angry',
+      suggested_reply:
+        'I am sorry you are still being charged after cancelling, and I understand why that feels serious. I have flagged the charge for urgent review so billing can confirm the cancellation and issue a refund.',
+      confidence: 0.92,
+      rationale:
+        'Charging after cancellation with a fraud allegation needs urgent billing review.',
+      needs_human_review: true,
+      tags: ['billing', 'cancellation', 'possible-fraud'],
+      model: 'gemini-3.5-flash-lite',
+      prompt_version: 'v2',
+      latency_ms: 4460,
+      status: 'ok',
+      error: null,
+    },
+    {
+      ticket_id: 15,
       urgency: 'Low',
       category: 'Other',
       sentiment: 'Neutral',
       suggested_reply:
-        'Apple Watch syncing is a feature request rather than a fault. I can confirm the request has been recorded.',
-      confidence: 0.62,
-      rationale:
-        'Feature request with no stated urgency; no existing behaviour has broken.',
-      needs_human_review: true,
-      tags: ['feature-request', 'ambiguous'],
+        "Health reports can be exported as a PDF from your father's profile, under the reports section, so you can share them with his doctor.",
+      confidence: 0.84,
+      rationale: 'Straightforward how-to question about exporting a report.',
+      needs_human_review: false,
+      tags: ['health-report', 'how-to'],
       model: 'gemini-3.5-flash-lite',
       prompt_version: 'v2',
-      latency_ms: 4520,
+      latency_ms: 3760,
+      status: 'ok',
+      error: null,
+    },
+    {
+      ticket_id: 16,
+      urgency: null,
+      category: null,
+      sentiment: null,
+      suggested_reply: null,
+      confidence: null,
+      rationale: null,
+      needs_human_review: true,
+      tags: [],
+      model: 'gemini-3.5-flash-lite',
+      prompt_version: 'v2',
+      latency_ms: 4110,
+      status: 'failed',
+      error:
+        'ValueError: Gemini response is missing required fields: urgency, rationale',
+    },
+    {
+      ticket_id: 17,
+      urgency: 'High',
+      category: 'Technical',
+      sentiment: 'Frustrated',
+      suggested_reply:
+        'I am sorry the video call kept dropping before the consultation could finish. Missing a clinical appointment is serious, so this has been escalated for a reliable follow-up call.',
+      confidence: 0.9,
+      rationale: 'Consultation blocked by call failures, so the care outcome is unresolved.',
+      needs_human_review: true,
+      tags: ['video-call', 'reliability'],
+      model: 'gemini-3.5-flash-lite',
+      prompt_version: 'v2',
+      latency_ms: 5390,
+      status: 'ok',
+      error: null,
+    },
+    {
+      ticket_id: 18,
+      urgency: 'Low',
+      category: 'Feedback',
+      sentiment: 'Happy',
+      suggested_reply:
+        'Thank you for sharing this. It is wonderful to hear that the redesign makes the app easier for your grandmother to use on her own.',
+      confidence: 0.95,
+      rationale: 'Positive feedback on the redesign with no problem reported.',
+      needs_human_review: false,
+      tags: ['positive-feedback', 'ui'],
+      model: 'gemini-3.5-flash-lite',
+      prompt_version: 'v2',
+      latency_ms: 3120,
+      status: 'ok',
+      error: null,
+    },
+    {
+      ticket_id: 19,
+      urgency: 'Low',
+      category: 'Billing',
+      sentiment: 'Neutral',
+      suggested_reply:
+        'Family plans covering several patients under one account are a billing question, so I have passed this to the team who can confirm availability and pricing.',
+      confidence: 0.8,
+      rationale: 'Product and pricing enquiry about family plans, with no urgency.',
+      needs_human_review: false,
+      tags: ['plan-change', 'pricing-question'],
+      model: 'gemini-3.5-flash-lite',
+      prompt_version: 'v2',
+      latency_ms: 4180,
+      status: 'ok',
+      error: null,
+    },
+    {
+      ticket_id: 20,
+      urgency: 'Critical',
+      category: 'Technical',
+      sentiment: 'Angry',
+      suggested_reply:
+        'I am sorry that months of blood pressure and glucose logs have disappeared. With an appointment tomorrow, recovering that history is urgent, so this has been escalated to our engineering team immediately.',
+      confidence: 0.95,
+      rationale: 'Irrecoverable health history loss blocks imminent clinical care.',
+      needs_human_review: true,
+      tags: ['data-loss', 'health-risk'],
+      model: 'gemini-3.5-flash-lite',
+      prompt_version: 'v2',
+      latency_ms: 5710,
       status: 'ok',
       error: null,
     },
