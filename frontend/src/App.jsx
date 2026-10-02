@@ -55,57 +55,67 @@ function App() {
 
   return (
     <div className="container py-4">
-      <header className="mb-4">
-        <h1 className="h3 mb-2">Caregene AI Support Ticket Triage</h1>
-        <p className="text-muted mb-2">
-          Runs the whole ticket dataset through the backend triage pipeline and
-          shows the batch summary and per-ticket results.
-        </p>
-        <div className="d-flex flex-wrap gap-2 align-items-center">
-          <span className={`badge ${healthVariant}`}>{healthLabel}</span>
-          {ticketCount !== null && (
-            <span className="badge text-bg-light border">
-              {ticketCount} tickets loaded
-            </span>
-          )}
-          {USING_MOCK_BATCH && (
-            <span
-              className="badge text-bg-info"
-              title="VITE_USE_MOCK_BATCH=true, so no request is sent"
-            >
-              Mock batch response
-            </span>
+      <div className="card shadow-sm mb-4">
+        <div className="card-body">
+          <header>
+            <h1 className="h3 mb-1">Caregene AI Triage</h1>
+            <p className="text-muted mb-3">Support Ticket Intelligence</p>
+            <div className="d-flex flex-wrap gap-2 align-items-center">
+              <span className={`badge ${healthVariant}`}>{healthLabel}</span>
+              {ticketCount !== null && (
+                <span className="badge text-bg-light border">
+                  {ticketCount} tickets loaded
+                </span>
+              )}
+              {USING_MOCK_BATCH && (
+                <span
+                  className="badge text-bg-info"
+                  title="VITE_USE_MOCK_BATCH=true, so no request is sent"
+                >
+                  Mock batch response
+                </span>
+              )}
+            </div>
+          </header>
+        </div>
+      </div>
+
+      <div className="card shadow-sm mb-4">
+        <div className="card-body">
+          <h2 className="h6 mb-1">Run a triage batch</h2>
+          <p className="text-muted small mb-3">
+            Sends every ticket in the dataset through the backend triage
+            pipeline. This is one model call per ticket, so a full run can take
+            a while.
+          </p>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleRunBatch}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <span
+                  className="spinner-border spinner-border-sm me-2"
+                  role="status"
+                  aria-hidden="true"
+                />
+                Running batch…
+              </>
+            ) : (
+              'Run Batch'
+            )}
+          </button>
+
+          {isLoading && (
+            <p className="text-muted small mt-2 mb-0">
+              Triaging every ticket in the dataset. This sends one model call
+              per ticket, so it can take a while.
+            </p>
           )}
         </div>
-      </header>
-
-      <div className="mb-4">
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={handleRunBatch}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <>
-              <span
-                className="spinner-border spinner-border-sm me-2"
-                role="status"
-                aria-hidden="true"
-              />
-              Running batch…
-            </>
-          ) : (
-            'Run Batch'
-          )}
-        </button>
-
-        {isLoading && (
-          <p className="text-muted mt-2 mb-0">
-            Triaging every ticket in the dataset. This sends one model call per
-            ticket, so it can take a while.
-          </p>
-        )}
       </div>
 
       {status === 'error' && (

@@ -10,12 +10,18 @@ function formatConfidence(averageConfidence) {
   return `${Math.round(averageConfidence * 100)}%`
 }
 
+// Below a second the exact millisecond count is the most useful figure. Above
+// it, seconds are far easier to read at a glance, so the unit switches.
 function formatLatency(averageLatencyMs) {
   if (averageLatencyMs === null || averageLatencyMs === undefined) {
     return EMPTY
   }
 
-  return `${Math.round(averageLatencyMs).toLocaleString('en-US')} ms`
+  if (averageLatencyMs < 1000) {
+    return `${Math.round(averageLatencyMs).toLocaleString('en-US')} ms`
+  }
+
+  return `${(averageLatencyMs / 1000).toFixed(1)} s`
 }
 
 function StatTile({ label, value, tone = '' }) {
