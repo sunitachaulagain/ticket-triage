@@ -37,32 +37,6 @@ function StatTile({ label, value, tone = '' }) {
   )
 }
 
-// The breakdowns arrive zero-filled with a fixed key set in the backend's enum
-// order, so they can be mapped directly. A zero here means no ticket carried
-// that classification, which is different from a missing key.
-function BreakdownCard({ title, items }) {
-  return (
-    <div className="col">
-      <div className="card h-100">
-        <div className="card-body py-3">
-          <div className="text-muted small mb-2">{title}</div>
-          <ul className="list-unstyled mb-0">
-            {Object.entries(items).map(([label, count]) => (
-              <li
-                key={label}
-                className="d-flex justify-content-between align-items-center"
-              >
-                <span>{label}</span>
-                <span className="badge text-bg-light border">{count}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function SummaryPanel({ summary }) {
   return (
     <section className="mb-4">
@@ -89,12 +63,6 @@ function SummaryPanel({ summary }) {
           label="Average latency"
           value={formatLatency(summary.average_latency_ms)}
         />
-      </div>
-
-      <div className="row row-cols-1 row-cols-md-3 g-3">
-        <BreakdownCard title="Urgency" items={summary.urgency_breakdown} />
-        <BreakdownCard title="Category" items={summary.category_breakdown} />
-        <BreakdownCard title="Sentiment" items={summary.sentiment_breakdown} />
       </div>
     </section>
   )

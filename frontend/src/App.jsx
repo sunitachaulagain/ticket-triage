@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getHealth, getTickets, runBatchTriage, USING_MOCK_BATCH } from './api/client'
+import BreakdownCharts from './components/BreakdownCharts'
 import ResultsTable from './components/ResultsTable'
 import SummaryPanel from './components/SummaryPanel'
 
@@ -128,6 +129,7 @@ function App() {
       {status === 'success' && batch && (
         <>
           <SummaryPanel summary={batch.summary} />
+          <BreakdownCharts summary={batch.summary} />
           <ResultsTable batch={batch} />
         </>
       )}
