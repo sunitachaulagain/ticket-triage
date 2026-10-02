@@ -57,7 +57,7 @@ export const MOCK_BATCH_RESPONSE = {
       category: 'Technical',
       sentiment: 'Angry',
       suggested_reply:
-        'I am sorry that the update removed your reminder history. Losing an evening insulin alert is a serious risk, so this needs immediate attention from our engineering team.',
+        "I am sorry the update removed your mother's medication reminders and that she missed her evening insulin dose as a result. Losing a medication alert for a dose she relies on is a serious safety concern.",
       confidence: 0.94,
       rationale:
         'Lost medication reminders caused a missed insulin dose, an immediate health risk.',
@@ -75,7 +75,7 @@ export const MOCK_BATCH_RESPONSE = {
       category: 'Billing',
       sentiment: 'Angry',
       suggested_reply:
-        'I am sorry you were charged twice for Premium this month. I understand how frustrating a duplicate charge is, and I have flagged it so billing can review the payment.',
+        'I am sorry you were charged twice for your Premium subscription this month. A duplicate charge like that is genuinely frustrating, and it is not what you should have been billed.',
       confidence: 0.91,
       rationale:
         'Duplicate subscription charge is a concrete financial problem needing prompt action.',
@@ -93,7 +93,7 @@ export const MOCK_BATCH_RESPONSE = {
       category: 'Account',
       sentiment: 'Neutral',
       suggested_reply:
-        'Adding a second caregiver means granting that person access to the profile. I can confirm the request is about sharing alert access, though the ticket does not include the steps to do it.',
+        "Adding a second caregiver means granting your sister access to your father's profile so that she also receives his alerts. The ticket does not include the steps for adding a caregiver, so it does not contain enough information for me to give you exact instructions.",
       confidence: 0.88,
       rationale:
         'Account access request with a clear outcome but no urgency signal.',
@@ -163,7 +163,7 @@ export const MOCK_BATCH_RESPONSE = {
       category: 'Billing',
       sentiment: 'Neutral',
       suggested_reply:
-        'Moving from monthly to annual billing is a plan change on your subscription, and annual plans usually carry a discount. I can confirm your request and point you to where the change is made.',
+        'Switching from monthly to annual billing is a change to the plan on your subscription. The ticket does not include your plan details or pricing, so it does not contain enough information for me to confirm whether an annual discount applies or where the change is made.',
       confidence: 0.85,
       rationale:
         'Clear billing and plan question with no complaint about an existing charge.',
@@ -181,7 +181,7 @@ export const MOCK_BATCH_RESPONSE = {
       category: 'Account',
       sentiment: 'Neutral',
       suggested_reply:
-        'Changing the app language is done in your profile settings, where Nepali can be selected from the language list.',
+        'Changing the app language so your mother is comfortable reading it is a reasonable request. The ticket does not say where the language setting is in the app, so it does not contain enough information for me to give you exact steps for choosing Nepali.',
       confidence: 0.9,
       rationale: 'Simple settings change request with a clear outcome and no urgency.',
       needs_human_review: false,
@@ -198,10 +198,10 @@ export const MOCK_BATCH_RESPONSE = {
       category: 'Technical',
       sentiment: 'Frustrated',
       suggested_reply:
-        "I am sorry the pill scanner stopped recognising your father's medications after the update. This looks like a regression in scanning accuracy and needs to be investigated by our team.",
+        "I am sorry the pill scanner stopped recognising your father's medications after the latest update, when it had been working the week before. A scanner that no longer reads a medication correctly is not something you should have to rely on day to day.",
       confidence: 0.93,
       rationale:
-        'Medication identification regressed after an update, which risks wrong doses.',
+        'Pill scanning stopped recognising medications after an update that had worked the week before.',
       needs_human_review: true,
       tags: ['medication-scanning', 'regression'],
       model: 'gemini-3.5-flash-lite',
@@ -216,7 +216,7 @@ export const MOCK_BATCH_RESPONSE = {
       category: 'Other',
       sentiment: 'Neutral',
       suggested_reply:
-        'Apple Watch syncing is a feature request rather than a fault. I can confirm the request has been recorded for the product team.',
+        'Apple Watch syncing is a feature request rather than something that has gone wrong, since the app is working as it does today. Getting reminders onto your wrist would be a meaningful addition for you.',
       confidence: 0.62,
       rationale:
         'Feature request with no stated urgency; no existing behaviour has broken.',
@@ -242,8 +242,7 @@ export const MOCK_BATCH_RESPONSE = {
       prompt_version: 'v2',
       latency_ms: 7640,
       status: 'failed',
-      error:
-        "HTTPStatusError: Client error '429 Too Many Requests' for url 'https://generativelanguage.googleapis.com/v1beta/interactions'",
+      error: 'HTTPStatusError: 429 Too Many Requests',
     },
     {
       ticket_id: 12,
@@ -268,7 +267,7 @@ export const MOCK_BATCH_RESPONSE = {
       category: 'Technical',
       sentiment: 'Frustrated',
       suggested_reply:
-        'I am sorry the dashboard is taking around 30 seconds to load. That is well outside the expected load time, so I have flagged the performance issue for the engineering team.',
+        'I am sorry the dashboard is taking around 30 seconds to load. Having to wait that long every single time you open the app makes it hard to use day to day.',
       confidence: 0.87,
       rationale:
         'Severe and repeatable slowness, reported as frustration rather than an outage.',
@@ -286,7 +285,7 @@ export const MOCK_BATCH_RESPONSE = {
       category: 'Billing',
       sentiment: 'Angry',
       suggested_reply:
-        'I am sorry you are still being charged after cancelling, and I understand why that feels serious. I have flagged the charge for urgent review so billing can confirm the cancellation and issue a refund.',
+        'I am sorry you are still being charged after cancelling your subscription. Being charged after cancelling is exactly the kind of thing that makes a customer feel their card is not secure, and it is not acceptable for that to be your experience.',
       confidence: 0.92,
       rationale:
         'Charging after cancellation with a fraud allegation needs urgent billing review.',
@@ -304,7 +303,7 @@ export const MOCK_BATCH_RESPONSE = {
       category: 'Other',
       sentiment: 'Neutral',
       suggested_reply:
-        "Health reports can be exported as a PDF from your father's profile, under the reports section, so you can share them with his doctor.",
+        "Getting your father's health report as a PDF to share with his doctor makes sense. The ticket does not say where reports are located or how the export works, so it does not contain enough information for me to point you to the right place.",
       confidence: 0.84,
       rationale: 'Straightforward how-to question about exporting a report.',
       needs_human_review: false,
@@ -338,7 +337,7 @@ export const MOCK_BATCH_RESPONSE = {
       category: 'Technical',
       sentiment: 'Frustrated',
       suggested_reply:
-        'I am sorry the video call kept dropping before the consultation could finish. Missing a clinical appointment is serious, so this has been escalated for a reliable follow-up call.',
+        'I am sorry the video call with the doctor kept dropping before you could finish the consultation. Not getting through a consultation is a significant problem, not just a technical irritation.',
       confidence: 0.9,
       rationale: 'Consultation blocked by call failures, so the care outcome is unresolved.',
       needs_human_review: true,
@@ -372,7 +371,7 @@ export const MOCK_BATCH_RESPONSE = {
       category: 'Billing',
       sentiment: 'Neutral',
       suggested_reply:
-        'Family plans covering several patients under one account are a billing question, so I have passed this to the team who can confirm availability and pricing.',
+        'A family plan covering several patients under one account is what you are asking about. The ticket does not contain enough information about which plans are offered for me to confirm whether a family plan is available.',
       confidence: 0.8,
       rationale: 'Product and pricing enquiry about family plans, with no urgency.',
       needs_human_review: false,
@@ -389,9 +388,10 @@ export const MOCK_BATCH_RESPONSE = {
       category: 'Technical',
       sentiment: 'Angry',
       suggested_reply:
-        'I am sorry that months of blood pressure and glucose logs have disappeared. With an appointment tomorrow, recovering that history is urgent, so this has been escalated to our engineering team immediately.',
+        'I am sorry that months of blood pressure and glucose logs have disappeared from the app. Needing that history for an appointment tomorrow makes losing it especially hard to replace.',
       confidence: 0.95,
-      rationale: 'Irrecoverable health history loss blocks imminent clinical care.',
+      rationale:
+        'Loss of months of health logs immediately before an appointment the customer needs them for.',
       needs_human_review: true,
       tags: ['data-loss', 'health-risk'],
       model: 'gemini-3.5-flash-lite',
