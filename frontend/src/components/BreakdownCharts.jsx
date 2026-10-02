@@ -16,6 +16,7 @@ const WARNING = '#ffc107'
 const INFO = '#0dcaf0'
 const SECONDARY = '#6c757d'
 const PRIMARY = '#0d6efd'
+const SUCCESS = '#198754'
 
 // Urgency keeps a colour per bar, matching URGENCY_VARIANT in ResultsTable, so
 // a glance at the chart reads the same way as a glance at the table.
@@ -26,11 +27,19 @@ const URGENCY_COLORS = {
   Low: SECONDARY,
 }
 
-// Category and sentiment use one colour for the whole chart. Their values are
-// peers rather than a severity scale, so a single colour is easier to read than
-// a set of colours that would imply an ordering that is not there.
+// Category uses one colour for the whole chart. Its values are peers rather
+// than a severity scale, so a single colour is easier to read than a set of
+// colours that would imply an ordering that is not there.
 const CATEGORY_COLOR = PRIMARY
-const SENTIMENT_COLOR = SECONDARY
+
+// Sentiment is an ordered scale, so it keeps a colour per bar, matching
+// SENTIMENT_VARIANT in ResultsTable: worst to best, Angry through Happy.
+const SENTIMENT_COLORS = {
+  Angry: DANGER,
+  Frustrated: WARNING,
+  Neutral: SECONDARY,
+  Happy: SUCCESS,
+}
 
 // Recharts measures its parent, so the chart needs a height it can rely on
 // instead of inheriting one.
@@ -121,7 +130,7 @@ function BreakdownCharts({ summary }) {
         <BreakdownChart
           title="Sentiment"
           breakdown={summary.sentiment_breakdown}
-          colorFor={() => SENTIMENT_COLOR}
+          colorFor={(label) => SENTIMENT_COLORS[label] ?? SECONDARY}
         />
       </div>
     </section>
