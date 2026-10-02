@@ -1,0 +1,10 @@
+/* Everything visual comes from Bootstrap. This file only holds the few
+   layout rules Bootstrap has no class for. */
+
+body {
+  background-color: var(--bs-tertiary-bg);
+}
+
+code {
+  word-break: break-all;
+}
