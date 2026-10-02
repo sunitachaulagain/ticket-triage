@@ -155,7 +155,7 @@ function App() {
                   role="status"
                   aria-hidden="true"
                 />
-                Running batch…
+                Processing tickets...
               </>
             ) : (
               'Run Batch'
@@ -163,10 +163,15 @@ function App() {
           </button>
 
           {isLoading && (
-            <p className="text-muted small mt-2 mb-0">
-              Triaging every ticket in the dataset. This sends one model call
-              per ticket, so it can take a while.
-            </p>
+            <div className="mt-3">
+              <div className="text-muted small mb-2">Processing tickets...</div>
+              <div className="progress" role="progressbar" aria-label="Batch progress" aria-valuenow={0} aria-valuemin={0} aria-valuemax={100}>
+                <div className="progress-bar progress-bar-striped progress-bar-animated" style={{ width: '100%' }} />
+              </div>
+              <p className="text-muted small mt-2 mb-0">
+                Analyzing the 20-ticket batch. This may take a little while.
+              </p>
+            </div>
           )}
         </div>
       </div>

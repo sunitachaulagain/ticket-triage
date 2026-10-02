@@ -10,13 +10,6 @@ class Urgency(str, Enum):
     LOW = "Low"
 
 
-URGENCY_RANK = {
-    Urgency.LOW: 1,
-    Urgency.MEDIUM: 2,
-    Urgency.HIGH: 3,
-    Urgency.CRITICAL: 4,
-}
-
 class Category(str, Enum):
     BILLING = "Billing"
     TECHNICAL = "Technical"
