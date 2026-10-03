@@ -527,9 +527,23 @@ of the defensive code.
 short enough that a hung connection does not hold a concurrency slot
 indefinitely.
 
-**Retry, on 429 only.** `MAX_RETRIES = 3`, with exponential backoff of 1s, 2s,
-4s. A 429 means the request was rejected for quota reasons and will be accepted
+**Retry, on 429 only.** `MAX_RETRIES = 3`, so a ticket makes at most 4 requests.
+A 429 means the request was rejected for quota reasons and will be accepted
 once the window resets, so retrying it is the right call.
+
+The delay before each retry is chosen in this order:
+
+1. **`Retry-After` if the header is present and valid.** The server knows when
+   its quota window resets, so it is a better answer than a guess. Only the
+   numeric seconds form is honoured; an HTTP-date or anything unparseable is
+   treated as absent rather than guessed at.
+2. **Exponential backoff otherwise**: 1s, 2s, 4s.
+3. **Jitter, always**: `delay *= uniform(0.8, 1.2)`. Tickets that hit a 429 in
+   the same window would otherwise wake up together and be rejected again in
+   lockstep, turning one rate limit into a retry storm.
+4. **A hard 30s cap, applied last.** 30 seconds is the longest a single ticket
+   will ever sleep, so a large or hostile `Retry-After` cannot pin a
+   concurrency slot for minutes.
 
 Everything else is deliberately *not* retried, and that is a decision rather
 than an omission:
@@ -540,7 +554,8 @@ than an omission:
   differently, so they are surfaced immediately instead of compounding latency
 
 When retries are exhausted the original 429 is raised rather than a wrapped
-error, so the caller sees the real cause.
+error, so the caller sees the real cause. There is no sleep after the final
+attempt: the third 429 raises immediately.
 
 **Backoff inside the measurement.** `latency_ms` is computed after the retry
 loop, so the reported latency includes backoff sleeps. Hiding them would make
@@ -821,7 +836,7 @@ Run it from the root, not from inside `backend/`. The tests import
 `backend.app...`, which relies on the repository root being on `sys.path`, and
 there is no `pytest.ini` or `pyproject.toml` to set that up for you.
 
-Current result: **53 passed**, and none of them touch the Gemini API. Every
+Current result: **86 passed**, and none of them touch the Gemini API. Every
 test module installs an autouse fixture that replaces the Gemini entry point
 with a function that raises, so an accidental live call fails loudly instead of
 quietly spending quota. `test_gemini_retry.py` goes further and patches
@@ -840,9 +855,11 @@ npm run build    # production build
 
 **External latency dominates.** Each ticket is one model call and they take
 seconds. A full batch is inherently slow, and the retries make it slower: a
-ticket that hits a 429 waits 1s, then 2s, then 4s before giving up, and that
-backoff is counted in its reported latency. I kept it in the measurement
-deliberately, but it means a single bad ticket can noticeably stretch the batch.
+ticket that hits a 429 waits out a jittered delay — 1s, 2s, 4s by default, or
+whatever `Retry-After` asks for — before giving up, and that backoff is counted
+in its reported latency. I kept it in the measurement deliberately, but it means
+a single bad ticket can noticeably stretch the batch. The 30s cap bounds how
+badly, not whether.
 
 **Rate limiting is real, not theoretical.** 429s show up in practice, which is
 why the retry path exists. But retrying a quota rejection makes total time less

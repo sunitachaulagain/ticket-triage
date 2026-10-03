@@ -18,8 +18,13 @@ import pytest
 
 from backend.app.services import gemini
 from backend.app.services.gemini import (
+    JITTER_MAX,
+    JITTER_MIN,
     MAX_RETRIES,
+    MAX_RETRY_DELAY_SECONDS,
     _backoff_seconds,
+    _retry_after_seconds,
+    _retry_delay_seconds,
     _should_retry,
     call_gemini,
 )
@@ -90,8 +95,10 @@ class FakeClock:
 def build_transport(responses: list):
     """Transport that replays ``responses`` in order, last one repeating.
 
-    A ``BaseException`` in the list is raised instead of returned, which is
-    how timeouts, transport failures and cancellation are simulated.
+    An int is a status code with an OK body; a prebuilt ``httpx.Response`` is
+    returned as-is, which is how response headers such as ``Retry-After`` are
+    simulated. A ``BaseException`` in the list is raised instead of returned,
+    which is how timeouts, transport failures and cancellation are simulated.
     """
     requests: list[httpx.Request] = []
 
@@ -103,9 +110,49 @@ def build_transport(responses: list):
         if isinstance(item, BaseException):
             raise item
 
+        if isinstance(item, httpx.Response):
+            return item
+
         return httpx.Response(item, json=OK_BODY)
 
     return httpx.MockTransport(handler), requests
+
+
+def rate_limited(retry_after: str | None = None) -> httpx.Response:
+    """A 429 response, optionally carrying a ``Retry-After`` header."""
+    headers = {} if retry_after is None else {"Retry-After": retry_after}
+
+    return httpx.Response(429, headers=headers, json=OK_BODY)
+
+
+def no_jitter(low: float, high: float) -> float:
+    """Jitter stub returning a neutral 1.0 multiplier.
+
+    This leaves the selected delay exactly assertable. The production default
+    is ``random.uniform``, which would make every delay assertion below
+    nondeterministic.
+    """
+    return 1.0
+
+
+def fixed_jitter(value: float):
+    """Jitter stub returning a constant, to prove jitter scales the delay."""
+
+    def jitter(low: float, high: float) -> float:
+        return value
+
+    return jitter
+
+
+def recording_jitter(value: float):
+    """Jitter stub recording the bounds it was called with."""
+    calls: list[tuple[float, float]] = []
+
+    def jitter(low: float, high: float) -> float:
+        calls.append((low, high))
+        return value
+
+    return jitter, calls
 
 
 def recording_sleep(clock: FakeClock | None = None):
@@ -139,7 +186,9 @@ def test_retries_on_429_then_succeeds() -> None:
     sleep, delays = recording_sleep()
 
     data, latency_ms = asyncio.run(
-        call_gemini("prompt", SCHEMA, sleep=sleep, transport=transport)
+        call_gemini(
+            "prompt", SCHEMA, sleep=sleep, transport=transport, jitter=no_jitter
+        )
     )
 
     assert len(requests) == 3
@@ -154,7 +203,13 @@ def test_raises_429_after_three_retries() -> None:
 
     with pytest.raises(httpx.HTTPStatusError) as excinfo:
         asyncio.run(
-            call_gemini("prompt", SCHEMA, sleep=sleep, transport=transport)
+            call_gemini(
+                "prompt",
+                SCHEMA,
+                sleep=sleep,
+                transport=transport,
+                jitter=no_jitter,
+            )
         )
 
     # Initial request plus MAX_RETRIES, and no sleep after the last one.
@@ -230,7 +285,13 @@ def test_latency_includes_retry_backoff(monkeypatch: pytest.MonkeyPatch) -> None
     sleep, delays = recording_sleep(clock)
 
     _, latency_ms = asyncio.run(
-        call_gemini("prompt", SCHEMA, sleep=sleep, transport=transport)
+        call_gemini(
+            "prompt",
+            SCHEMA,
+            sleep=sleep,
+            transport=transport,
+            jitter=no_jitter,
+        )
     )
 
     # Backoff delays must be inside the measurement, not excluded from it.
@@ -244,6 +305,283 @@ def test_backoff_delays_are_exponential() -> None:
         2.0,
         4.0,
     ]
+
+
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    [
+        (None, None),
+        ("5", 5.0),
+        ("0", 0.0),
+        (" 2.5 ", 2.5),
+        ("120", 120.0),
+        ("", None),
+        ("   ", None),
+        ("soon", None),
+        ("Wed, 21 Oct 2015 07:28:00 GMT", None),
+        ("-5", None),
+        ("nan", None),
+        ("inf", None),
+        ("1,5", None),
+    ],
+)
+def test_retry_after_seconds_parsing(header: str | None, expected) -> None:
+    """Only the numeric form is a usable delay; everything else is ignored."""
+    response = httpx.Response(429, json=OK_BODY)
+
+    if header is not None:
+        response.headers["Retry-After"] = header
+
+    assert _retry_after_seconds(response) == expected
+
+
+def test_valid_retry_after_is_honored() -> None:
+    transport, requests = build_transport([rate_limited("7"), 200])
+    sleep, delays = recording_sleep()
+
+    data, _ = asyncio.run(
+        call_gemini(
+            "prompt",
+            SCHEMA,
+            sleep=sleep,
+            transport=transport,
+            jitter=no_jitter,
+        )
+    )
+
+    assert len(requests) == 2
+    assert delays == [7.0]
+    assert data == OK_BODY
+
+
+def test_retry_after_overrides_exponential_on_every_retry() -> None:
+    transport, requests = build_transport(
+        [rate_limited("3"), rate_limited("9"), rate_limited("1"), 200]
+    )
+    sleep, delays = recording_sleep()
+
+    asyncio.run(
+        call_gemini(
+            "prompt",
+            SCHEMA,
+            sleep=sleep,
+            transport=transport,
+            jitter=no_jitter,
+        )
+    )
+
+    assert len(requests) == 4
+    assert delays == [3.0, 9.0, 1.0]
+
+
+@pytest.mark.parametrize(
+    "header", ["", "   ", "soon", "abc", "-5", "nan", "inf", "1,5"]
+)
+def test_invalid_retry_after_falls_back_to_exponential(header: str) -> None:
+    transport, _ = build_transport([rate_limited(header), 200])
+    sleep, delays = recording_sleep()
+
+    asyncio.run(
+        call_gemini(
+            "prompt",
+            SCHEMA,
+            sleep=sleep,
+            transport=transport,
+            jitter=no_jitter,
+        )
+    )
+
+    assert delays == [1.0]
+
+
+def test_missing_retry_after_falls_back_to_exponential() -> None:
+    transport, _ = build_transport([rate_limited(), 429, 200])
+    sleep, delays = recording_sleep()
+
+    asyncio.run(
+        call_gemini(
+            "prompt",
+            SCHEMA,
+            sleep=sleep,
+            transport=transport,
+            jitter=no_jitter,
+        )
+    )
+
+    assert delays == [1.0, 2.0]
+
+
+def test_retry_after_is_capped_at_thirty_seconds() -> None:
+    transport, _ = build_transport([rate_limited("120"), 200])
+    sleep, delays = recording_sleep()
+
+    asyncio.run(
+        call_gemini(
+            "prompt",
+            SCHEMA,
+            sleep=sleep,
+            transport=transport,
+            jitter=no_jitter,
+        )
+    )
+
+    assert delays == [MAX_RETRY_DELAY_SECONDS]
+
+
+def test_cap_applies_after_jitter_so_no_sleep_exceeds_the_limit() -> None:
+    """The 30s limit is a hard ceiling, not a cap on the requested delay."""
+    transport, _ = build_transport([rate_limited("120"), 200])
+    sleep, delays = recording_sleep()
+
+    asyncio.run(
+        call_gemini(
+            "prompt",
+            SCHEMA,
+            sleep=sleep,
+            transport=transport,
+            jitter=fixed_jitter(1.2),
+        )
+    )
+
+    # Capping before jitter would have produced 36.0 here.
+    assert delays == [MAX_RETRY_DELAY_SECONDS]
+
+
+def test_no_retry_sleep_ever_exceeds_the_limit() -> None:
+    """Across every attempt and a Retry-After far past the cap."""
+    transport, _ = build_transport([rate_limited("10000"), 200])
+    sleep, delays = recording_sleep()
+
+    asyncio.run(call_gemini("prompt", SCHEMA, sleep=sleep, transport=transport))
+
+    assert delays
+    assert max(delays) <= MAX_RETRY_DELAY_SECONDS
+
+
+def test_jitter_scales_the_selected_delay() -> None:
+    transport, _ = build_transport([429, 429, 429, 200])
+    sleep, delays = recording_sleep()
+
+    asyncio.run(
+        call_gemini(
+            "prompt",
+            SCHEMA,
+            sleep=sleep,
+            transport=transport,
+            jitter=fixed_jitter(1.2),
+        )
+    )
+
+    assert delays == [1.2, 2.4, 4.8]
+
+
+def test_jitter_is_called_once_per_retry_with_the_expected_bounds() -> None:
+    transport, _ = build_transport([429, 429, 200])
+    sleep, delays = recording_sleep()
+    jitter, calls = recording_jitter(1.0)
+
+    asyncio.run(
+        call_gemini(
+            "prompt",
+            SCHEMA,
+            sleep=sleep,
+            transport=transport,
+            jitter=jitter,
+        )
+    )
+
+    assert delays == [1.0, 2.0]
+    assert calls == [(JITTER_MIN, JITTER_MAX), (JITTER_MIN, JITTER_MAX)]
+    assert (JITTER_MIN, JITTER_MAX) == (0.8, 1.2)
+
+
+def test_concurrent_tickets_do_not_retry_in_lockstep() -> None:
+    """Two tickets sharing one jitter source still get different delays."""
+    delays: list[float] = []
+
+    async def sleep(delay: float) -> None:
+        delays.append(delay)
+
+    jitter = iter([0.8, 1.2])
+
+    def alternating(low: float, high: float) -> float:
+        return next(jitter)
+
+    async def call() -> None:
+        # A transport per call: a shared one would share its response
+        # sequence, so the second ticket would see a 200 and never retry.
+        transport, _ = build_transport([rate_limited(), 200])
+
+        await call_gemini(
+            "prompt",
+            SCHEMA,
+            sleep=sleep,
+            transport=transport,
+            jitter=alternating,
+        )
+
+    async def main() -> None:
+        await asyncio.gather(call(), call())
+
+    asyncio.run(main())
+
+    assert sorted(delays) == [0.8, 1.2]
+
+
+def test_retry_after_is_ignored_after_the_final_attempt() -> None:
+    transport, requests = build_transport([rate_limited("5")])
+    sleep, delays = recording_sleep()
+
+    with pytest.raises(httpx.HTTPStatusError) as excinfo:
+        asyncio.run(
+            call_gemini(
+                "prompt",
+                SCHEMA,
+                sleep=sleep,
+                transport=transport,
+                jitter=no_jitter,
+            )
+        )
+
+    assert len(requests) == MAX_RETRIES + 1 == 4
+    # Three sleeps, not four: Retry-After on the last 429 buys no extra wait.
+    assert delays == [5.0, 5.0, 5.0]
+    assert excinfo.value.response.status_code == 429
+
+
+def test_latency_includes_retry_after_sleep(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = FakeClock()
+    monkeypatch.setattr(time, "perf_counter", clock.perf_counter)
+
+    transport, _ = build_transport([rate_limited("2"), rate_limited("3"), 200])
+    sleep, delays = recording_sleep(clock)
+
+    _, latency_ms = asyncio.run(
+        call_gemini(
+            "prompt",
+            SCHEMA,
+            sleep=sleep,
+            transport=transport,
+            jitter=no_jitter,
+        )
+    )
+
+    assert delays == [2.0, 3.0]
+    assert latency_ms == 5000
+
+
+def test_retry_delay_prefers_retry_after_over_backoff() -> None:
+    with_header = httpx.Response(
+        429, headers={"Retry-After": "12"}, json=OK_BODY
+    )
+    without_header = httpx.Response(429, json=OK_BODY)
+
+    # Attempt 0 would be 1s from the curve alone.
+    assert _retry_delay_seconds(with_header, 0, no_jitter) == 12.0
+    assert _retry_delay_seconds(without_header, 0, no_jitter) == 1.0
+    assert _retry_delay_seconds(without_header, 2, no_jitter) == 4.0
 
 
 def test_only_429_is_retryable() -> None:
