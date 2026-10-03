@@ -7,6 +7,3 @@ __pycache__/
 node_modules/
 dist/
 screenshots/
-
-# Confidential take-home brief - keep local, never publish
-docs/Caregene_Intern_Project_Brief.pdf
