@@ -336,7 +336,8 @@ def test_retry_after_seconds_parsing(header: str | None, expected) -> None:
 
 
 def test_valid_retry_after_is_honored() -> None:
-    transport, requests = build_transport([rate_limited("7"), 200])
+    # 0.5s asks for less than the 1s backoff, so it is honoured as-is.
+    transport, requests = build_transport([rate_limited("0.5"), 200])
     sleep, delays = recording_sleep()
 
     data, _ = asyncio.run(
@@ -350,11 +351,11 @@ def test_valid_retry_after_is_honored() -> None:
     )
 
     assert len(requests) == 2
-    assert delays == [7.0]
+    assert delays == [0.5]
     assert data == OK_BODY
 
 
-def test_retry_after_overrides_exponential_on_every_retry() -> None:
+def test_retry_after_never_exceeds_exponential_on_any_retry() -> None:
     transport, requests = build_transport(
         [rate_limited("3"), rate_limited("9"), rate_limited("1"), 200]
     )
@@ -371,7 +372,9 @@ def test_retry_after_overrides_exponential_on_every_retry() -> None:
     )
 
     assert len(requests) == 4
-    assert delays == [3.0, 9.0, 1.0]
+    # The backoff (1s, 2s, 4s) is the ceiling: 3 and 9 are clamped to it,
+    # while 1 shortens the final wait.
+    assert delays == [1.0, 2.0, 1.0]
 
 
 @pytest.mark.parametrize(
@@ -411,7 +414,7 @@ def test_missing_retry_after_falls_back_to_exponential() -> None:
     assert delays == [1.0, 2.0]
 
 
-def test_retry_after_is_capped_at_thirty_seconds() -> None:
+def test_large_retry_after_is_bounded_by_backoff() -> None:
     transport, _ = build_transport([rate_limited("120"), 200])
     sleep, delays = recording_sleep()
 
@@ -425,11 +428,11 @@ def test_retry_after_is_capped_at_thirty_seconds() -> None:
         )
     )
 
-    assert delays == [MAX_RETRY_DELAY_SECONDS]
+    # A huge Retry-After can no longer stretch the wait past the 1s backoff.
+    assert delays == [1.0]
 
 
-def test_cap_applies_after_jitter_so_no_sleep_exceeds_the_limit() -> None:
-    """The 30s limit is a hard ceiling, not a cap on the requested delay."""
+def test_jitter_applies_to_the_bounded_retry_after_delay() -> None:
     transport, _ = build_transport([rate_limited("120"), 200])
     sleep, delays = recording_sleep()
 
@@ -443,8 +446,8 @@ def test_cap_applies_after_jitter_so_no_sleep_exceeds_the_limit() -> None:
         )
     )
 
-    # Capping before jitter would have produced 36.0 here.
-    assert delays == [MAX_RETRY_DELAY_SECONDS]
+    # Bounded to the 1s backoff first, then jittered: 1.0 * 1.2.
+    assert delays == [1.2]
 
 
 def test_no_retry_sleep_ever_exceeds_the_limit() -> None:
@@ -545,7 +548,8 @@ def test_retry_after_is_ignored_after_the_final_attempt() -> None:
 
     assert len(requests) == MAX_RETRIES + 1 == 4
     # Three sleeps, not four: Retry-After on the last 429 buys no extra wait.
-    assert delays == [5.0, 5.0, 5.0]
+    # Each is bounded by the backoff curve (1s, 2s, 4s).
+    assert delays == [1.0, 2.0, 4.0]
     assert excinfo.value.response.status_code == 429
 
 
@@ -555,7 +559,7 @@ def test_latency_includes_retry_after_sleep(
     clock = FakeClock()
     monkeypatch.setattr(time, "perf_counter", clock.perf_counter)
 
-    transport, _ = build_transport([rate_limited("2"), rate_limited("3"), 200])
+    transport, _ = build_transport([rate_limited("0.5"), rate_limited("1.5"), 200])
     sleep, delays = recording_sleep(clock)
 
     _, latency_ms = asyncio.run(
@@ -568,18 +572,24 @@ def test_latency_includes_retry_after_sleep(
         )
     )
 
-    assert delays == [2.0, 3.0]
-    assert latency_ms == 5000
+    assert delays == [0.5, 1.5]
+    assert latency_ms == 2000
 
 
-def test_retry_delay_prefers_retry_after_over_backoff() -> None:
-    with_header = httpx.Response(
+def test_retry_delay_never_exceeds_backoff() -> None:
+    long_header = httpx.Response(
         429, headers={"Retry-After": "12"}, json=OK_BODY
+    )
+    short_header = httpx.Response(
+        429, headers={"Retry-After": "0.5"}, json=OK_BODY
     )
     without_header = httpx.Response(429, json=OK_BODY)
 
+    # A Retry-After longer than the curve is clamped to it.
+    assert _retry_delay_seconds(long_header, 0, no_jitter) == 1.0
+    # A shorter one is honoured.
+    assert _retry_delay_seconds(short_header, 0, no_jitter) == 0.5
     # Attempt 0 would be 1s from the curve alone.
-    assert _retry_delay_seconds(with_header, 0, no_jitter) == 12.0
     assert _retry_delay_seconds(without_header, 0, no_jitter) == 1.0
     assert _retry_delay_seconds(without_header, 2, no_jitter) == 4.0
 

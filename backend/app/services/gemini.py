@@ -79,14 +79,20 @@ def _retry_delay_seconds(
 ) -> float:
     """Delay before the retry that follows ``attempt``.
 
-    A valid ``Retry-After`` wins over the exponential backoff; anything else
-    uses it. The result is jittered so simultaneous 429s do not retry at the
-    same instant, then capped so no single sleep exceeds
+    The exponential backoff for the attempt is the ceiling: a valid
+    ``Retry-After`` can only shorten the wait, never stretch it past the 1s,
+    2s, 4s curve. In a batch, a long ``Retry-After`` would otherwise hold a
+    concurrency slot for tens of seconds per ticket and turn one rate limit
+    into a multi-minute stall. The result is jittered so simultaneous 429s do
+    not retry at the same instant, then capped so no single sleep exceeds
     ``MAX_RETRY_DELAY_SECONDS``.
     """
+    delay = _backoff_seconds(attempt)
+
     requested = _retry_after_seconds(response)
 
-    delay = _backoff_seconds(attempt) if requested is None else requested
+    if requested is not None:
+        delay = min(delay, requested)
 
     return min(
         delay * jitter(JITTER_MIN, JITTER_MAX),
