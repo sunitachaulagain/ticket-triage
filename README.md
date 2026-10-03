@@ -746,8 +746,10 @@ response body or in `/openapi.json`.
 ```
 
 It serves on http://127.0.0.1:8000, with interactive docs at `/docs`. CORS is
-restricted to the local frontend origins `http://localhost:5173` and
-`http://127.0.0.1:5173`; wildcard origins are never combined with credentials.
+restricted to three explicit frontend origins: the local development origins
+`http://localhost:5173` and `http://127.0.0.1:5173`, plus the deployed Vercel
+frontend `https://ticket-triage-silk.vercel.app`. Wildcard origins are never
+combined with credentials.
 
 ### 6. Run the frontend
 
@@ -890,15 +892,29 @@ In rough priority order:
 6. **Observability.** Structured logging with a request ID per ticket, plus
    latency and error-rate metrics, so a production regression is visible rather
    than inferred from a support ticket.
-7. **Deployment.** Containerise the backend, build the frontend, and put CORS
-   behind configuration instead of a hardcoded local origin list.
+7. **Deployment configuration.** Deployment itself is done — the backend runs
+   on Render at https://ticket-triage-akq3.onrender.com and the frontend on
+   Vercel at https://ticket-triage-silk.vercel.app. What is still missing is
+   putting CORS behind configuration instead of a hardcoded origin list, and
+   containerising the backend so the deploy is reproducible rather than
+   dependent on Render's build behaviour.
 
 ## Deployment
 
-Not deployed yet. This currently runs locally only: the backend on uvicorn and
-the frontend on the Vite dev server. CORS is hardcoded to the two localhost
-origins, so a real deployment needs that moved into configuration first. The
-`.env` handling assumes a single local operator.
+Deployed and live. The backend runs on Render and the frontend on Vercel:
+
+- Frontend / Live Demo: https://ticket-triage-silk.vercel.app/
+- Backend API: https://ticket-triage-akq3.onrender.com
+- API Documentation: https://ticket-triage-akq3.onrender.com/docs
+
+The backend is still FastAPI under uvicorn, now fronted by Render. CORS is
+hardcoded to three explicit origins — the two localhost origins used in
+development plus `https://ticket-triage-silk.vercel.app` — so wildcard origins
+are still never combined with credentials. The frontend reads
+`VITE_API_BASE_URL`, which defaults to the local backend but is set to the
+Render API in the Vercel build. `GEMINI_API_KEY` is supplied as a Render
+environment variable, since the `.env` handling above assumes a single local
+operator.
 
 ## Design / Engineering Decisions
 
@@ -929,7 +945,7 @@ same objects that pick the colours, so they cannot disagree.
 
 ## Demo
 
-- Live URL: _not deployed yet_
+- Live URL: https://ticket-triage-silk.vercel.app/
 - Demo video: _not recorded yet_
 - Screenshots of the dashboard: _to be added_
 
