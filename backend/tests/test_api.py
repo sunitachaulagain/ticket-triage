@@ -8,7 +8,7 @@ silently spending API quota.
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.app.config import GEMINI_API_KEY
+from backend.app.config import GROQ_API_KEY
 from backend.app.schemas import (
     Category,
     Sentiment,
@@ -281,8 +281,8 @@ def test_cors_disallowed_origin_gets_no_header(client: TestClient) -> None:
 
 
 def test_responses_never_expose_api_key(client: TestClient) -> None:
-    if not GEMINI_API_KEY:
-        pytest.skip("GEMINI_API_KEY is not configured")
+    if not GROQ_API_KEY:
+        pytest.skip("GROQ_API_KEY is not configured")
 
     bodies = [
         client.get("/").text,
@@ -292,4 +292,4 @@ def test_responses_never_expose_api_key(client: TestClient) -> None:
     ]
 
     for body in bodies:
-        assert GEMINI_API_KEY not in body
+        assert GROQ_API_KEY not in body

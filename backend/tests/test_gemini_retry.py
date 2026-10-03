@@ -1,4 +1,4 @@
-"""Gemini retry tests. None of these contact the Gemini API.
+"""Groq retry tests. None of these contact the Groq API.
 
 Every test drives ``call_gemini`` through an ``httpx.MockTransport`` and an
 injected ``sleep``, so no socket is opened and no real time passes. The
@@ -76,7 +76,7 @@ def no_external_network(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture(autouse=True)
 def configured_key(monkeypatch: pytest.MonkeyPatch) -> None:
     """Use a fake key so these tests never depend on a real .env value."""
-    monkeypatch.setattr(gemini, "GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(gemini, "GROQ_API_KEY", "test-key")
 
 
 class FakeClock:
@@ -595,7 +595,7 @@ def test_retry_delay_never_exceeds_backoff() -> None:
 
 
 def test_only_429_is_retryable() -> None:
-    request = httpx.Request("POST", gemini.GEMINI_URL)
+    request = httpx.Request("POST", gemini.GROQ_URL)
 
     assert _should_retry(httpx.Response(429, request=request)) is True
 
@@ -608,12 +608,12 @@ def test_only_429_is_retryable() -> None:
 def test_missing_api_key_raises_before_any_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(gemini, "GEMINI_API_KEY", None)
+    monkeypatch.setattr(gemini, "GROQ_API_KEY", None)
 
     transport, requests = build_transport([200])
     sleep, delays = recording_sleep()
 
-    with pytest.raises(RuntimeError, match="GEMINI_API_KEY"):
+    with pytest.raises(RuntimeError, match="GROQ_API_KEY"):
         asyncio.run(
             call_gemini("prompt", SCHEMA, sleep=sleep, transport=transport)
         )

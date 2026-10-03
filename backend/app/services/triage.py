@@ -15,7 +15,11 @@ import time
 from backend.app.dataset import SupportTicket, load_tickets
 from backend.app.prompts import PROMPT_VERSION, build_triage_prompt
 from backend.app.schemas import TriageResult, TriageStatus
-from backend.app.services.gemini import MODEL_NAME, call_gemini
+from backend.app.services.gemini import (
+    MODEL_NAME,
+    REQUEST_SPACING_SECONDS,
+    call_gemini,
+)
 from backend.app.services.parser import extract_model_output
 from backend.app.services.triage_schema import TRIAGE_RESPONSE_SCHEMA
 from backend.app.services.validate import validate_triage_result
@@ -49,6 +53,9 @@ async def triage_ticket(ticket: SupportTicket) -> TriageResult:
     data, latency_ms = await call_gemini(
         prompt,
         TRIAGE_RESPONSE_SCHEMA,
+        # The provider meters tokens per minute, so tickets are spaced instead
+        # of being sent as fast as the semaphore admits them.
+        min_interval=REQUEST_SPACING_SECONDS,
     )
 
     raw = extract_model_output(data)

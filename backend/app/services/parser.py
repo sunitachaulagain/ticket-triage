@@ -2,26 +2,19 @@ import json
 
 
 def extract_model_output(data: dict) -> dict:
-    steps = data.get("steps", [])
+    for choice in data.get("choices", []):
+        message = choice.get("message", {})
 
-    for step in steps:
-        if step.get("type") != "model_output":
+        text = (message.get("content") or "").strip()
+
+        if not text:
             continue
 
-        for content in step.get("content", []):
-            if content.get("type") != "text":
-                continue
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "Groq returned invalid JSON"
+            ) from exc
 
-            text = content.get("text", "").strip()
-
-            if not text:
-                continue
-
-            try:
-                return json.loads(text)
-            except json.JSONDecodeError as exc:
-                raise ValueError(
-                    "Gemini returned invalid JSON"
-                ) from exc
-
-    raise ValueError("No model output found in Gemini response")
+    raise ValueError("No model output found in Groq response")
