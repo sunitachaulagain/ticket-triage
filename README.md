@@ -515,8 +515,11 @@ result.needs_human_review = (
 This runs in `validate.py` *after* validation and overwrites whatever the model
 returned. The model is asked for the field because it carries useful signal,
 but it does not get to decide. A Critical ticket always goes to a human, and so
-does anything the model was unsure about. The test `test_batch_summary_matches_calculate_statistics`
-and the assertions in `test_triage.py` pin this behaviour.
+does anything the model was unsure about. No test calls `validate_triage_result`
+directly, so the rule is not pinned by a unit test; it is covered indirectly by
+`test_results.py::test_counts_needs_human_review`, which checks that
+`calculate_statistics` counts flagged results, and by `test_api.py`, which checks
+the summary over the batch route.
 
 ## Reliability
 

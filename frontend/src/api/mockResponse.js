@@ -21,8 +21,8 @@ export const MOCK_BATCH_RESPONSE = {
     successful: 17,
     failed: 3,
     // Failed results always count, because a failed result is by definition
-    // queued for a human. 9 more flagged from the successful results.
-    needs_human_review: 12,
+    // queued for a human. 4 more flagged from the successful results.
+    needs_human_review: 7,
     // mean of the 17 successful confidences = 15.06 / 17
     average_confidence: 0.8859,
     // mean of all 20 latencies = 144320 / 20. Failed results are included
@@ -79,7 +79,7 @@ export const MOCK_BATCH_RESPONSE = {
       confidence: 0.91,
       rationale:
         'Duplicate subscription charge is a concrete financial problem needing prompt action.',
-      needs_human_review: true,
+      needs_human_review: false,
       tags: ['billing', 'duplicate-charge'],
       model: 'gemini-3.5-flash-lite',
       prompt_version: 'v3',
@@ -202,7 +202,7 @@ export const MOCK_BATCH_RESPONSE = {
       confidence: 0.93,
       rationale:
         'Pill scanning stopped recognising medications after an update that had worked the week before.',
-      needs_human_review: true,
+      needs_human_review: false,
       tags: ['medication-scanning', 'regression'],
       model: 'gemini-3.5-flash-lite',
       prompt_version: 'v3',
@@ -220,7 +220,7 @@ export const MOCK_BATCH_RESPONSE = {
       confidence: 0.62,
       rationale:
         'Feature request with no stated urgency; no existing behaviour has broken.',
-      needs_human_review: true,
+      needs_human_review: false,
       tags: ['feature-request', 'wearable'],
       model: 'gemini-3.5-flash-lite',
       prompt_version: 'v3',
@@ -271,7 +271,7 @@ export const MOCK_BATCH_RESPONSE = {
       confidence: 0.87,
       rationale:
         'Severe and repeatable slowness, reported as frustration rather than an outage.',
-      needs_human_review: true,
+      needs_human_review: false,
       tags: ['performance', 'slow-load'],
       model: 'gemini-3.5-flash-lite',
       prompt_version: 'v3',
@@ -340,7 +340,7 @@ export const MOCK_BATCH_RESPONSE = {
         'I am sorry the video call with the doctor kept dropping before you could finish the consultation. Not getting through a consultation is a significant problem, not just a technical irritation.',
       confidence: 0.9,
       rationale: 'Consultation blocked by call failures, so the care outcome is unresolved.',
-      needs_human_review: true,
+      needs_human_review: false,
       tags: ['video-call', 'reliability'],
       model: 'gemini-3.5-flash-lite',
       prompt_version: 'v3',
